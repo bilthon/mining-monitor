@@ -253,6 +253,22 @@
                     </div>
                 </div>
             </div>
+            <div class="col-6 col-md-3 mb-3">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="card-title">Hardware Errors</div>
+                        <div class="card-value" id="stat-hw-errors">—</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3 mb-3">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="card-title">Uptime</div>
+                        <div class="card-value" id="stat-uptime">—</div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Thermal Grid Panel -->
@@ -412,6 +428,16 @@
             });
         }
 
+        function fmtUptime(seconds) {
+            if (!seconds) return '—';
+            const d = Math.floor(seconds / 86400);
+            const h = Math.floor((seconds % 86400) / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            if (d > 0) return `${d}d ${h}h`;
+            if (h > 0) return `${h}h ${m}m`;
+            return `${m}m`;
+        }
+
         function updateStatCards(data) {
             if (data && data.miner) {
                 document.getElementById('stat-ghs').textContent = data.miner.ghs_avg ? data.miner.ghs_avg.toFixed(0) : '—';
@@ -420,8 +446,10 @@
                 document.getElementById('stat-accepted').textContent = data.miner.accepted || '—';
                 document.getElementById('stat-rejected').textContent = data.miner.rejected || '—';
                 document.getElementById('stat-rejection').textContent = data.miner.rejection_pct ? data.miner.rejection_pct.toFixed(2) : '—';
+                document.getElementById('stat-hw-errors').textContent = data.miner.hardware_errors ?? '—';
+                document.getElementById('stat-uptime').textContent = fmtUptime(data.miner.elapsed);
             } else {
-                ['stat-ghs', 'stat-temp', 'stat-fan', 'stat-accepted', 'stat-rejected', 'stat-rejection'].forEach(id => {
+                ['stat-ghs', 'stat-temp', 'stat-fan', 'stat-accepted', 'stat-rejected', 'stat-rejection', 'stat-hw-errors', 'stat-uptime'].forEach(id => {
                     document.getElementById(id).textContent = '—';
                 });
             }
