@@ -436,6 +436,91 @@ def api_chain_temperatures():
     return jsonify(data)
 
 
+@app.route('/api/error-history')
+@login_required
+def api_error_history():
+    """Return hardware error rate history with per-interval deltas and restart markers."""
+    range_param = request.args.get('range', '24h')
+
+    now = datetime.now()
+    if range_param == '7d':
+        cutoff = now - timedelta(days=7)
+        downsample = 4
+    elif range_param == '30d':
+        cutoff = now - timedelta(days=30)
+        downsample = 18
+    else:
+        cutoff = now - timedelta(hours=24)
+        downsample = 1
+
+    cutoff_epoch = int(cutoff.timestamp())
+
+    try:
+        with DB_MANAGER.get_connection() as conn:
+            cursor = conn.cursor()
+            # Fetch one extra row before the cutoff so we can compute the first delta
+            cursor.execute("""
+                SELECT timestamp, hardware_errors, elapsed
+                FROM miner_metrics
+                WHERE timestamp >= (
+                    SELECT COALESCE(MAX(timestamp), ?)
+                    FROM miner_metrics WHERE timestamp < ?
+                )
+                ORDER BY timestamp ASC
+            """, (cutoff_epoch, cutoff_epoch))
+            all_rows = cursor.fetchall()
+    except Exception as e:
+        app.logger.error(f"Error querying error history: {e}")
+        return jsonify({'error': str(e)}), 500
+
+    if not all_rows:
+        return jsonify({'labels': [], 'delta': [], 'cumulative': [], 'restarts': [],
+                        'stats': {'total_errors': 0, 'avg_rate': 0, 'peak_rate': 0, 'restart_count': 0}})
+
+    # Compute deltas and detect restarts (elapsed decreased = miner restarted)
+    labels, deltas, cumulatives, restarts = [], [], [], []
+    prev_errors = all_rows[0][1]
+    prev_elapsed = all_rows[0][2]
+
+    in_range_rows = [r for r in all_rows if r[0] >= cutoff_epoch]
+    downsampled = [in_range_rows[i] for i in range(0, len(in_range_rows), downsample)]
+
+    for row in downsampled:
+        ts_epoch, hw_errors, elapsed = row
+        label = epoch_to_csv_timestamp(ts_epoch)
+
+        restarted = (elapsed is not None and prev_elapsed is not None and elapsed < prev_elapsed)
+        delta = 0 if restarted or hw_errors < prev_errors else (hw_errors - prev_errors)
+
+        if restarted:
+            restarts.append(label)
+
+        labels.append(label)
+        deltas.append(delta)
+        cumulatives.append(hw_errors)
+
+        prev_errors = hw_errors
+        prev_elapsed = elapsed
+
+    total = cumulatives[-1] if cumulatives else 0
+    non_zero = [d for d in deltas if d > 0]
+    avg_rate = round(sum(non_zero) / len(deltas), 2) if deltas else 0
+    peak_rate = max(deltas) if deltas else 0
+
+    return jsonify({
+        'labels': labels,
+        'delta': deltas,
+        'cumulative': cumulatives,
+        'restarts': restarts,
+        'stats': {
+            'total_errors': total,
+            'avg_rate': avg_rate,
+            'peak_rate': peak_rate,
+            'restart_count': len(restarts),
+        }
+    })
+
+
 @app.route('/api/history')
 @login_required
 def api_history():
