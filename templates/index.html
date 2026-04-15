@@ -378,7 +378,10 @@
             const chartConfigs = {
                 chartHashRate: {
                     type: 'line',
-                    data: { labels: [], datasets: [{ label: 'Avg', data: [], borderColor: '#58a6ff', tension: 0.1 }] },
+                    data: { labels: [], datasets: [
+                        { label: 'Avg (ghs_avg)', data: [], borderColor: '#58a6ff', tension: 0.1, pointRadius: 0 },
+                        { label: 'Real (ghs_5s)', data: [], borderColor: '#3fb950', tension: 0.1, pointRadius: 0, borderDash: [4, 3], borderWidth: 1.5 }
+                    ]},
                 },
                 chartMinerTemp: {
                     type: 'line',
@@ -436,6 +439,7 @@
             if (data.miner && data.miner.labels) {
                 charts.chartHashRate.data.labels = data.miner.labels;
                 charts.chartHashRate.data.datasets[0].data = data.miner.ghs_avg;
+                charts.chartHashRate.data.datasets[1].data = data.miner.ghs_5s || [];
                 charts.chartHashRate.update();
 
                 charts.chartMinerTemp.data.labels = data.miner.labels;
