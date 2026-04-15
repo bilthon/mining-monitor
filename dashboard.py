@@ -209,6 +209,9 @@ def api_live():
                 fan_row = cursor.fetchone()
 
                 if temp_row and fan_row:
+                    fans = [int(fan_row[i] or 0) for i in range(4)]
+                    active_fans = [f for f in fans if f > 0]
+                    fan_avg = sum(active_fans) / len(active_fans) if active_fans else 0
                     miner_data = {
                         'ghs_5s': float(miner_row[1]),
                         'ghs_avg': float(miner_row[2]),
@@ -216,11 +219,11 @@ def api_live():
                         'temp2': int(temp_row[1] or 0),
                         'temp3': int(temp_row[2] or 0),
                         'temp_max': int(temp_row[3]),
-                        'fan_avg': float(fan_row[4] or 0),
-                        'fan1': int(fan_row[0]),
-                        'fan2': int(fan_row[1]),
-                        'fan3': int(fan_row[2]),
-                        'fan4': int(fan_row[3]),
+                        'fan_avg': fan_avg,
+                        'fan1': fans[0],
+                        'fan2': fans[1],
+                        'fan3': fans[2],
+                        'fan4': fans[3],
                         'accepted': int(miner_row[4]),
                         'rejected': int(miner_row[5]),
                         'rejection_pct': float(miner_row[6]),
