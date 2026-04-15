@@ -485,33 +485,30 @@ def api_history():
                 ghs_avg_list = []
                 ghs_5s_list = []
                 temp_max_list = []
-                fan_avg_list = []
+                fan_lists = [[], [], [], []]
 
                 for row in downsampled_rows:
                     timestamp_epoch = row[0]
                     ghs_avg = row[1]
                     ghs_5s = row[2]
                     temp_max = row[3]
-                    fan1, fan2, fan3, fan4 = row[4], row[5], row[6], row[7]
+                    fan_vals = [int(row[4] or 0), int(row[5] or 0), int(row[6] or 0), int(row[7] or 0)]
 
-                    # Convert epoch back to CSV format for label
                     label = epoch_to_csv_timestamp(timestamp_epoch)
                     labels.append(label)
                     ghs_avg_list.append(float(ghs_avg))
                     ghs_5s_list.append(float(ghs_5s))
                     temp_max_list.append(int(temp_max or 0))
-
-                    # Calculate fan average
-                    fans = [int(fan1 or 0), int(fan2 or 0), int(fan3 or 0), int(fan4 or 0)]
-                    fan_avg = sum(fans) / len([f for f in fans if f > 0]) if any(fans) else 0
-                    fan_avg_list.append(fan_avg)
+                    for i, v in enumerate(fan_vals):
+                        fan_lists[i].append(v)
 
                 if labels:
                     data['miner']['labels'] = labels
                     data['miner']['ghs_avg'] = ghs_avg_list
                     data['miner']['ghs_5s'] = ghs_5s_list
                     data['miner']['temp_max'] = temp_max_list
-                    data['miner']['fan_avg'] = fan_avg_list
+                    for i, fl in enumerate(fan_lists):
+                        data['miner'][f'fan{i+1}'] = fl
 
     except Exception as e:
         app.logger.warning(f"SQLite query failed for miner history: {e}")
@@ -538,12 +535,8 @@ def api_history():
                         data['miner']['ghs_5s'] = [float(row.get('ghs_5s', 0)) for row in rows]
                         data['miner']['temp_max'] = [int(row.get('temp_max', 0)) for row in rows]
 
-                        fan_avgs = []
-                        for row in rows:
-                            fans = [int(row.get(f'fan{i}', 0)) for i in range(1, 5)]
-                            avg = sum(fans) / len([f for f in fans if f > 0]) if any(fans) else 0
-                            fan_avgs.append(avg)
-                        data['miner']['fan_avg'] = fan_avgs
+                        for i in range(1, 5):
+                            data['miner'][f'fan{i}'] = [int(row.get(f'fan{i}', 0)) for row in rows]
         except Exception as e:
             app.logger.error(f"Error reading miner CSV fallback: {e}")
 
