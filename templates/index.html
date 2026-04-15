@@ -396,12 +396,18 @@
                     type: 'line',
                     data: { labels: [], datasets: [
                         { label: 'Avg (ghs_avg)', data: [], borderColor: '#58a6ff', tension: 0.1, pointRadius: 0 },
-                        { label: 'Real (ghs_5s)', data: [], borderColor: '#3fb950', tension: 0.1, pointRadius: 0, borderDash: [4, 3], borderWidth: 1.5 }
+                        { label: 'Real (ghs_5s)', data: [], borderColor: '#3fb950', tension: 0.1, pointRadius: 0, borderDash: [4, 3], borderWidth: 1.5 },
+                        { label: '30m avg', data: [], borderColor: '#ffa657', tension: 0.1, pointRadius: 0, borderWidth: 2 },
                     ]},
                 },
                 chartMinerTemp: {
                     type: 'line',
-                    data: { labels: [], datasets: [{ label: 'Max', data: [], borderColor: '#f85149', tension: 0.1 }] },
+                    data: { labels: [], datasets: [
+                        { label: 'Max', data: [], borderColor: '#f85149', tension: 0.1, pointRadius: 0, borderWidth: 2 },
+                        { label: 'Chain 1', data: [], borderColor: '#ffa657', tension: 0.1, pointRadius: 0, borderDash: [4, 3], borderWidth: 1.5 },
+                        { label: 'Chain 2', data: [], borderColor: '#d2a8ff', tension: 0.1, pointRadius: 0, borderDash: [4, 3], borderWidth: 1.5 },
+                        { label: 'Chain 3', data: [], borderColor: '#79c0ff', tension: 0.1, pointRadius: 0, borderDash: [4, 3], borderWidth: 1.5 },
+                    ]},
                 },
                 chartFan: {
                     type: 'line',
@@ -473,10 +479,14 @@
                 charts.chartHashRate.data.labels = data.miner.labels;
                 charts.chartHashRate.data.datasets[0].data = data.miner.ghs_avg;
                 charts.chartHashRate.data.datasets[1].data = data.miner.ghs_5s || [];
+                charts.chartHashRate.data.datasets[2].data = data.miner.ghs_30m || [];
                 charts.chartHashRate.update();
 
                 charts.chartMinerTemp.data.labels = data.miner.labels;
                 charts.chartMinerTemp.data.datasets[0].data = data.miner.temp_max;
+                charts.chartMinerTemp.data.datasets[1].data = data.miner.temp1 || [];
+                charts.chartMinerTemp.data.datasets[2].data = data.miner.temp2 || [];
+                charts.chartMinerTemp.data.datasets[3].data = data.miner.temp3 || [];
                 charts.chartMinerTemp.update();
 
                 charts.chartFan.data.labels = data.miner.labels;

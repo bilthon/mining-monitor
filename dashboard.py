@@ -467,7 +467,9 @@ def api_history():
 
             # Query miner metrics with downsampling in Python
             cursor.execute("""
-                SELECT mm.timestamp, mm.ghs_avg, mm.ghs_5s, mt.temp_max, mf.fan1, mf.fan2, mf.fan3, mf.fan4
+                SELECT mm.timestamp, mm.ghs_avg, mm.ghs_5s, mm.ghs_30m,
+                       mt.temp_max, mt.temp1, mt.temp2, mt.temp3,
+                       mf.fan1, mf.fan2, mf.fan3, mf.fan4
                 FROM miner_metrics mm
                 LEFT JOIN miner_temperatures mt ON mm.timestamp = mt.timestamp AND mt.miner_id = 1
                 LEFT JOIN miner_fans mf ON mm.timestamp = mf.timestamp AND mf.miner_id = 1
@@ -484,21 +486,25 @@ def api_history():
                 labels = []
                 ghs_avg_list = []
                 ghs_5s_list = []
+                ghs_30m_list = []
                 temp_max_list = []
+                temp_lists = [[], [], []]
                 fan_lists = [[], [], [], []]
 
                 for row in downsampled_rows:
                     timestamp_epoch = row[0]
-                    ghs_avg = row[1]
-                    ghs_5s = row[2]
-                    temp_max = row[3]
-                    fan_vals = [int(row[4] or 0), int(row[5] or 0), int(row[6] or 0), int(row[7] or 0)]
+                    ghs_avg, ghs_5s, ghs_30m = row[1], row[2], row[3]
+                    temp_max, temp1, temp2, temp3 = row[4], row[5], row[6], row[7]
+                    fan_vals = [int(row[8] or 0), int(row[9] or 0), int(row[10] or 0), int(row[11] or 0)]
 
                     label = epoch_to_csv_timestamp(timestamp_epoch)
                     labels.append(label)
                     ghs_avg_list.append(float(ghs_avg))
                     ghs_5s_list.append(float(ghs_5s))
+                    ghs_30m_list.append(float(ghs_30m))
                     temp_max_list.append(int(temp_max or 0))
+                    for i, t in enumerate([temp1, temp2, temp3]):
+                        temp_lists[i].append(int(t or 0))
                     for i, v in enumerate(fan_vals):
                         fan_lists[i].append(v)
 
@@ -506,7 +512,10 @@ def api_history():
                     data['miner']['labels'] = labels
                     data['miner']['ghs_avg'] = ghs_avg_list
                     data['miner']['ghs_5s'] = ghs_5s_list
+                    data['miner']['ghs_30m'] = ghs_30m_list
                     data['miner']['temp_max'] = temp_max_list
+                    for i, tl in enumerate(temp_lists):
+                        data['miner'][f'temp{i+1}'] = tl
                     for i, fl in enumerate(fan_lists):
                         data['miner'][f'fan{i+1}'] = fl
 
@@ -533,8 +542,10 @@ def api_history():
                         data['miner']['labels'] = [row['timestamp'] for row in rows]
                         data['miner']['ghs_avg'] = [float(row.get('ghs_avg', 0)) for row in rows]
                         data['miner']['ghs_5s'] = [float(row.get('ghs_5s', 0)) for row in rows]
+                        data['miner']['ghs_30m'] = [float(row.get('ghs_30m', 0)) for row in rows]
                         data['miner']['temp_max'] = [int(row.get('temp_max', 0)) for row in rows]
-
+                        for i in range(1, 4):
+                            data['miner'][f'temp{i}'] = [int(row.get(f'temp{i}', 0)) for row in rows]
                         for i in range(1, 5):
                             data['miner'][f'fan{i}'] = [int(row.get(f'fan{i}', 0)) for row in rows]
         except Exception as e:
