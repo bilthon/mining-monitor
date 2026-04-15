@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bitcoin Mining Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #0d1117; color: #c9d1d9; }
+        .navbar { background-color: #161b22; border-bottom: 1px solid #30363d; }
+        .card { background-color: #0d1117; border: 1px solid #30363d; }
+        .card-title { color: #79c0ff; font-size: 0.85rem; font-weight: 600; }
+        .card-value { font-size: 2rem; font-weight: bold; color: #58a6ff; }
+        .chart-container { position: relative; height: 300px; margin-bottom: 2rem; }
+        .btn-group-range .btn { background-color: #238636; border-color: #238636; color: #fff; }
+        .btn-group-range .btn.active { background-color: #2dd4bf; border-color: #2dd4bf; color: #000; }
+        .btn-group-range .btn:hover { background-color: #2ea043; }
+        .login-container { max-width: 400px; margin: 100px auto; }
+        .login-card { background-color: #0d1117; border: 1px solid #30363d; padding: 2rem; border-radius: 0.5rem; }
+        .form-control { background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9; }
+        .form-control:focus { background-color: #0d1117; border: 1px solid #58a6ff; color: #c9d1d9; box-shadow: none; }
+        .btn-login { background-color: #238636; border: none; color: #fff; font-weight: 600; }
+        .btn-login:hover { background-color: #2ea043; color: #fff; }
+        .btn-logout { background-color: #da3633; border: none; }
+        .btn-logout:hover { background-color: #f85149; }
+        .error-msg { color: #f85149; }
+        .last-updated { font-size: 0.85rem; color: #8b949e; }
+
+        /* Thermal Grid Styles */
+        .thermal-grid-container { overflow-x: auto; }
+
+        /* Chain wrapper */
+        .thermal-chain-wrapper {
+            background-color: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .thermal-chain-title {
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: #79c0ff;
+            margin-bottom: 0.75rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid #30363d;
+        }
+
+        /* Three-column layout for sensor types */
+        .thermal-chain-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+        }
+
+        /* Section for each sensor type */
+        .thermal-section {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .thermal-section-header {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: #58a6ff;
+            background-color: #0d1117;
+            padding: 0.5rem;
+            border-radius: 4px 4px 0 0;
+            border-bottom: 2px solid #30363d;
+            text-align: center;
+        }
+
+        /* 2x2 grid for position cells within each section */
+        .thermal-positions-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.5rem;
+            padding: 0.5rem;
+        }
+
+        .thermal-grid-cell {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 0.5rem;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            min-height: 50px;
+            border: 1px solid #30363d;
+            cursor: help;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+        .thermal-grid-cell:hover {
+            border-color: #58a6ff;
+            transform: scale(1.05);
+        }
+        .thermal-grid-cell-label {
+            font-size: 0.65rem;
+            color: #8b949e;
+            margin-top: 0.2rem;
+            font-weight: 500;
+        }
+
+        /* Temperature color scale */
+        .thermal-temp-cool { background-color: #1f6feb; color: #fff; }       /* Blue: < 50°C */
+        .thermal-temp-normal { background-color: #238636; color: #fff; }     /* Green: 50-65°C */
+        .thermal-temp-warm { background-color: #d29922; color: #000; }       /* Yellow: 65-75°C */
+        .thermal-temp-hot { background-color: #f85149; color: #fff; }        /* Red: > 75°C */
+        .thermal-temp-nodata { background-color: #30363d; color: #8b949e; }  /* Gray: No data */
+
+        .thermal-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+        .thermal-stat-card {
+            background-color: #161b22;
+            border: 1px solid #30363d;
+            padding: 1rem;
+            border-radius: 6px;
+            text-align: center;
+        }
+        .thermal-stat-label {
+            font-size: 0.85rem;
+            color: #8b949e;
+            margin-bottom: 0.5rem;
+        }
+        .thermal-stat-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #58a6ff;
+        }
+
+        /* Responsive thermal grid */
+        @media (max-width: 992px) {
+            .thermal-chain-grid {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 0.75rem;
+            }
+            .thermal-grid-cell {
+                min-height: 45px;
+                padding: 0.4rem;
+                font-size: 0.8rem;
+            }
+            .thermal-grid-cell-label { font-size: 0.6rem; margin-top: 0.1rem; }
+        }
+
+        @media (max-width: 768px) {
+            .thermal-chain-grid {
+                grid-template-columns: 1fr;
+            }
+            .thermal-grid-cell {
+                min-height: 40px;
+                padding: 0.3rem;
+                font-size: 0.75rem;
+            }
+            .thermal-grid-cell-label { display: none; }
+            .thermal-section-header { font-size: 0.75rem; }
+            .thermal-chain-title { font-size: 0.85rem; }
+        }
+    </style>
+</head>
+<body>
+    {% if page == 'dashboard' %}
+    <!-- Dashboard View -->
+    <nav class="navbar navbar-dark">
+        <div class="container-fluid">
+            <span class="navbar-brand mb-0 h1">⛏️ Mining Dashboard</span>
+            <div class="d-flex align-items-center">
+                <span class="last-updated me-3" id="lastUpdated">Last updated: —</span>
+                <form action="/logout" method="post" style="display: inline;">
+                    <button type="submit" class="btn btn-sm btn-logout">Logout</button>
+                </form>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid p-4">
+        <!-- Live Stats Cards -->
+        <div class="row mb-4" id="statCards">
+            <div class="col-6 col-md-3 mb-3">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="card-title">Hash Rate (avg)</div>
+                        <div class="card-value" id="stat-ghs">—</div>
+                        <small class="text-muted">GH/s</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3 mb-3">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="card-title">Miner Temp</div>
+                        <div class="card-value" id="stat-temp">—</div>
+                        <small class="text-muted">°C</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3 mb-3">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="card-title">Fan Speed</div>
+                        <div class="card-value" id="stat-fan">—</div>
+                        <small class="text-muted">RPM</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3 mb-3">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="card-title">Room Temp</div>
+                        <div class="card-value" id="stat-room-temp">—</div>
+                        <small class="text-muted">°C</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3 mb-3">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="card-title">Accepted Shares</div>
+                        <div class="card-value" id="stat-accepted">—</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3 mb-3">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="card-title">Rejected Shares</div>
+                        <div class="card-value" id="stat-rejected">—</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3 mb-3">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="card-title">Rejection %</div>
+                        <div class="card-value" id="stat-rejection">—</div>
+                        <small class="text-muted">%</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3 mb-3">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="card-title">Humidity</div>
+                        <div class="card-value" id="stat-humidity">—</div>
+                        <small class="text-muted">%</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Thermal Grid Panel -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="card-title mb-3">Thermal Grid: Chain Temperature Sensors (36 Sensors)</h6>
+                        <div class="thermal-grid-container">
+                            <div id="thermalGridContainer">
+                                <div style="text-align: center; color: #8b949e; padding: 2rem;">Loading thermal data...</div>
+                            </div>
+                        </div>
+                        <div class="thermal-stats">
+                            <div class="thermal-stat-card">
+                                <div class="thermal-stat-label">Maximum Temperature</div>
+                                <div class="thermal-stat-value" id="thermalMaxTemp">—</div>
+                            </div>
+                            <div class="thermal-stat-card">
+                                <div class="thermal-stat-label">Minimum Temperature</div>
+                                <div class="thermal-stat-value" id="thermalMinTemp">—</div>
+                            </div>
+                            <div class="thermal-stat-card">
+                                <div class="thermal-stat-label">Average Temperature</div>
+                                <div class="thermal-stat-value" id="thermalAvgTemp">—</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Time Range Buttons -->
+        <div class="mb-4">
+            <div class="btn-group btn-group-range" role="group">
+                <input type="radio" class="btn-check" name="range" id="range24h" value="24h" checked>
+                <label class="btn" for="range24h">24h</label>
+
+                <input type="radio" class="btn-check" name="range" id="range7d" value="7d">
+                <label class="btn" for="range7d">7d</label>
+
+                <input type="radio" class="btn-check" name="range" id="range30d" value="30d">
+                <label class="btn" for="range30d">30d</label>
+            </div>
+        </div>
+
+        <!-- Charts -->
+        <div class="row">
+            <div class="col-12 mb-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="card-title mb-3">Hash Rate (GH/s)</h6>
+                        <div class="chart-container">
+                            <canvas id="chartHashRate"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6 mb-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="card-title mb-3">Miner Temperatures (°C)</h6>
+                        <div class="chart-container">
+                            <canvas id="chartMinerTemp"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 mb-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="card-title mb-3">Fan Speeds (RPM)</h6>
+                        <div class="chart-container">
+                            <canvas id="chartFan"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6 mb-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="card-title mb-3">Room Temperature (°C)</h6>
+                        <div class="chart-container">
+                            <canvas id="chartRoomTemp"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 mb-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="card-title mb-3">Room Humidity (%)</h6>
+                        <div class="chart-container">
+                            <canvas id="chartHumidity"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <script>
+        const chartDefaults = {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { labels: { color: '#8b949e' } } },
+            scales: {
+                x: { ticks: { color: '#8b949e' }, grid: { color: '#30363d' } },
+                y: { ticks: { color: '#8b949e' }, grid: { color: '#30363d' } }
+            }
+        };
+
+        const charts = {};
+
+        function initCharts() {
+            const chartConfigs = {
+                chartHashRate: {
+                    type: 'line',
+                    data: { labels: [], datasets: [{ label: 'Avg', data: [], borderColor: '#58a6ff', tension: 0.1 }] },
+                },
+                chartMinerTemp: {
+                    type: 'line',
+                    data: { labels: [], datasets: [{ label: 'Max', data: [], borderColor: '#f85149', tension: 0.1 }] },
+                },
+                chartFan: {
+                    type: 'line',
+                    data: { labels: [], datasets: [{ label: 'Avg', data: [], borderColor: '#79c0ff', tension: 0.1 }] },
+                },
+                chartRoomTemp: {
+                    type: 'line',
+                    data: { labels: [], datasets: [{ label: 'Temp', data: [], borderColor: '#79c0ff', tension: 0.1 }] },
+                },
+                chartHumidity: {
+                    type: 'line',
+                    data: { labels: [], datasets: [{ label: 'Humidity', data: [], borderColor: '#79c0ff', tension: 0.1 }] },
+                }
+            };
+
+            Object.entries(chartConfigs).forEach(([id, config]) => {
+                const ctx = document.getElementById(id).getContext('2d');
+                charts[id] = new Chart(ctx, { ...config, options: chartDefaults });
+            });
+        }
+
+        function updateStatCards(data) {
+            if (data && data.miner) {
+                document.getElementById('stat-ghs').textContent = data.miner.ghs_avg ? data.miner.ghs_avg.toFixed(0) : '—';
+                document.getElementById('stat-temp').textContent = data.miner.temp_max || '—';
+                document.getElementById('stat-fan').textContent = data.miner.fan_avg ? data.miner.fan_avg.toFixed(0) : '—';
+                document.getElementById('stat-accepted').textContent = data.miner.accepted || '—';
+                document.getElementById('stat-rejected').textContent = data.miner.rejected || '—';
+                document.getElementById('stat-rejection').textContent = data.miner.rejection_pct ? data.miner.rejection_pct.toFixed(2) : '—';
+            } else {
+                ['stat-ghs', 'stat-temp', 'stat-fan', 'stat-accepted', 'stat-rejected', 'stat-rejection'].forEach(id => {
+                    document.getElementById(id).textContent = '—';
+                });
+            }
+
+            if (data && data.sensor) {
+                document.getElementById('stat-room-temp').textContent = data.sensor.temperature ? data.sensor.temperature.toFixed(1) : '—';
+                document.getElementById('stat-humidity').textContent = data.sensor.humidity ? data.sensor.humidity.toFixed(1) : '—';
+            } else {
+                document.getElementById('stat-room-temp').textContent = '—';
+                document.getElementById('stat-humidity').textContent = '—';
+            }
+
+            const time = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+            document.getElementById('lastUpdated').textContent = `Last updated: ${time}`;
+        }
+
+        function updateCharts(data) {
+            if (!data) return;
+
+            if (data.miner && data.miner.labels) {
+                charts.chartHashRate.data.labels = data.miner.labels;
+                charts.chartHashRate.data.datasets[0].data = data.miner.ghs_avg;
+                charts.chartHashRate.update();
+
+                charts.chartMinerTemp.data.labels = data.miner.labels;
+                charts.chartMinerTemp.data.datasets[0].data = data.miner.temp_max;
+                charts.chartMinerTemp.update();
+
+                charts.chartFan.data.labels = data.miner.labels;
+                charts.chartFan.data.datasets[0].data = data.miner.fan_avg;
+                charts.chartFan.update();
+            }
+
+            if (data.sensor && data.sensor.labels) {
+                charts.chartRoomTemp.data.labels = data.sensor.labels;
+                charts.chartRoomTemp.data.datasets[0].data = data.sensor.temperature;
+                charts.chartRoomTemp.update();
+
+                charts.chartHumidity.data.labels = data.sensor.labels;
+                charts.chartHumidity.data.datasets[0].data = data.sensor.humidity;
+                charts.chartHumidity.update();
+            }
+        }
+
+        function getTemperatureColor(tempValue) {
+            /**
+             * Map temperature value to color class.
+             * Blue: < 50°C (cool)
+             * Green: 50-65°C (normal)
+             * Yellow: 65-75°C (warm)
+             * Red: > 75°C (hot)
+             */
+            if (tempValue === null || tempValue === undefined) {
+                return 'thermal-temp-nodata';
+            }
+            if (tempValue < 50) return 'thermal-temp-cool';
+            if (tempValue < 65) return 'thermal-temp-normal';
+            if (tempValue < 75) return 'thermal-temp-warm';
+            return 'thermal-temp-hot';
+        }
+
+        function renderThermalGrid(data) {
+            const container = document.getElementById('thermalGridContainer');
+            if (!data || !data.chains || data.chains.length === 0) {
+                container.innerHTML = '<div style="text-align: center; color: #8b949e; padding: 2rem;">No thermal data available</div>';
+                document.getElementById('thermalMaxTemp').textContent = '—';
+                document.getElementById('thermalMinTemp').textContent = '—';
+                document.getElementById('thermalAvgTemp').textContent = '—';
+                return;
+            }
+
+            // Update stats
+            if (data.stats) {
+                document.getElementById('thermalMaxTemp').textContent = data.stats.max_temp !== null ? data.stats.max_temp + '°C' : '—';
+                document.getElementById('thermalMinTemp').textContent = data.stats.min_temp !== null ? data.stats.min_temp + '°C' : '—';
+                document.getElementById('thermalAvgTemp').textContent = data.stats.avg_temp !== null ? data.stats.avg_temp + '°C' : '—';
+            }
+
+            // Build thermal grid HTML
+            let html = '';
+            const sensorTypes = ['ASIC Chips', 'PCB', 'PIC Controller'];
+            const sensorKeys = ['chip', 'pcb', 'pic'];
+
+            for (const chain of data.chains) {
+                const chainNum = chain.chain_number;
+
+                // Create wrapper for this chain
+                html += `<div class="thermal-chain-wrapper">`;
+                html += `<div class="thermal-chain-title">Chain ${chainNum}</div>`;
+                html += `<div class="thermal-chain-grid">`;
+
+                // Create three sections: ASIC Chips, PCB, PIC Controller
+                for (let typeIdx = 0; typeIdx < sensorKeys.length; typeIdx++) {
+                    const sensorKey = sensorKeys[typeIdx];
+                    const sensorType = sensorTypes[typeIdx];
+
+                    html += `<div class="thermal-section">`;
+                    html += `<div class="thermal-section-header">${sensorType}</div>`;
+                    html += `<div class="thermal-positions-grid">`;
+
+                    // Render 4 position cells in a 2x2 grid
+                    for (let pos = 0; pos < 4; pos++) {
+                        const tempValue = chain.sensors[sensorKey][pos];
+
+                        if (tempValue !== null && tempValue !== undefined) {
+                            const colorClass = getTemperatureColor(tempValue);
+                            html += `<div class="thermal-grid-cell ${colorClass}" title="${sensorType} Position ${pos + 1}: ${tempValue.toFixed(1)}°C">
+                                <span>${tempValue.toFixed(0)}°</span>
+                                <span class="thermal-grid-cell-label">${pos + 1}</span>
+                            </div>`;
+                        } else {
+                            html += `<div class="thermal-grid-cell thermal-temp-nodata" title="No data">
+                                <span>—</span>
+                                <span class="thermal-grid-cell-label">${pos + 1}</span>
+                            </div>`;
+                        }
+                    }
+
+                    html += `</div></div>`;
+                }
+
+                html += `</div></div>`;
+            }
+
+            container.innerHTML = html;
+        }
+
+        function refreshThermalGrid() {
+            fetch('/api/chain-temperatures')
+                .then(r => r.json())
+                .then(data => renderThermalGrid(data))
+                .catch(e => {
+                    console.error('Error fetching thermal data:', e);
+                    const container = document.getElementById('thermalGridContainer');
+                    container.innerHTML = '<div style="text-align: center; color: #f85149; padding: 2rem;">Error loading thermal data</div>';
+                });
+        }
+
+        function refreshLive() {
+            fetch('/api/live')
+                .then(r => r.json())
+                .then(data => updateStatCards(data))
+                .catch(() => updateStatCards(null));
+        }
+
+        function loadHistory(range) {
+            fetch(`/api/history?range=${range}`)
+                .then(r => r.json())
+                .then(data => updateCharts(data))
+                .catch(e => console.error('Error loading history:', e));
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initCharts();
+            loadHistory('24h');
+            refreshLive();
+            refreshThermalGrid();
+            // Refresh every 30 seconds (synchronized with live data)
+            setInterval(refreshLive, 30000);
+            setInterval(refreshThermalGrid, 30000);
+        });
+
+        document.querySelectorAll('input[name="range"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                loadHistory(e.target.value);
+            });
+        });
+    </script>
+    {% else %}
+    <!-- Login View -->
+    <div class="login-container">
+        <div class="login-card">
+            <h2 class="mb-4 text-center">⛏️ Mining Dashboard</h2>
+            {% if error %}
+            <div class="alert alert-danger" role="alert">{{ error }}</div>
+            {% endif %}
+            <form method="post" action="/login">
+                <div class="mb-3">
+                    <label for="username" class="form-label">Username</label>
+                    <input type="text" class="form-control" id="username" name="username" required autofocus>
+                </div>
+                <div class="mb-3">
+                    <label for="password" class="form-label">Password</label>
+                    <input type="password" class="form-control" id="password" name="password" required>
+                </div>
+                <button type="submit" class="btn btn-login w-100">Login</button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
