@@ -464,7 +464,7 @@ def api_history():
 
             # Query miner metrics with downsampling in Python
             cursor.execute("""
-                SELECT mm.timestamp, mm.ghs_avg, mt.temp_max, mf.fan1, mf.fan2, mf.fan3, mf.fan4
+                SELECT mm.timestamp, mm.ghs_avg, mm.ghs_5s, mt.temp_max, mf.fan1, mf.fan2, mf.fan3, mf.fan4
                 FROM miner_metrics mm
                 LEFT JOIN miner_temperatures mt ON mm.timestamp = mt.timestamp AND mt.miner_id = 1
                 LEFT JOIN miner_fans mf ON mm.timestamp = mf.timestamp AND mf.miner_id = 1
@@ -480,19 +480,22 @@ def api_history():
 
                 labels = []
                 ghs_avg_list = []
+                ghs_5s_list = []
                 temp_max_list = []
                 fan_avg_list = []
 
                 for row in downsampled_rows:
                     timestamp_epoch = row[0]
                     ghs_avg = row[1]
-                    temp_max = row[2]
-                    fan1, fan2, fan3, fan4 = row[3], row[4], row[5], row[6]
+                    ghs_5s = row[2]
+                    temp_max = row[3]
+                    fan1, fan2, fan3, fan4 = row[4], row[5], row[6], row[7]
 
                     # Convert epoch back to CSV format for label
                     label = epoch_to_csv_timestamp(timestamp_epoch)
                     labels.append(label)
                     ghs_avg_list.append(float(ghs_avg))
+                    ghs_5s_list.append(float(ghs_5s))
                     temp_max_list.append(int(temp_max or 0))
 
                     # Calculate fan average
@@ -503,6 +506,7 @@ def api_history():
                 if labels:
                     data['miner']['labels'] = labels
                     data['miner']['ghs_avg'] = ghs_avg_list
+                    data['miner']['ghs_5s'] = ghs_5s_list
                     data['miner']['temp_max'] = temp_max_list
                     data['miner']['fan_avg'] = fan_avg_list
 
@@ -528,6 +532,7 @@ def api_history():
                     if rows:
                         data['miner']['labels'] = [row['timestamp'] for row in rows]
                         data['miner']['ghs_avg'] = [float(row.get('ghs_avg', 0)) for row in rows]
+                        data['miner']['ghs_5s'] = [float(row.get('ghs_5s', 0)) for row in rows]
                         data['miner']['temp_max'] = [int(row.get('temp_max', 0)) for row in rows]
 
                         fan_avgs = []
