@@ -389,7 +389,12 @@
                 },
                 chartFan: {
                     type: 'line',
-                    data: { labels: [], datasets: [{ label: 'Avg', data: [], borderColor: '#79c0ff', tension: 0.1 }] },
+                    data: { labels: [], datasets: [
+                        { label: 'Fan 1', data: [], borderColor: '#79c0ff', tension: 0.1, pointRadius: 0 },
+                        { label: 'Fan 2', data: [], borderColor: '#d2a8ff', tension: 0.1, pointRadius: 0 },
+                        { label: 'Fan 3', data: [], borderColor: '#ffa657', tension: 0.1, pointRadius: 0 },
+                        { label: 'Fan 4', data: [], borderColor: '#3fb950', tension: 0.1, pointRadius: 0 },
+                    ]},
                 },
                 chartRoomTemp: {
                     type: 'line',
@@ -447,7 +452,10 @@
                 charts.chartMinerTemp.update();
 
                 charts.chartFan.data.labels = data.miner.labels;
-                charts.chartFan.data.datasets[0].data = data.miner.fan_avg;
+                charts.chartFan.data.datasets[0].data = data.miner.fan1 || [];
+                charts.chartFan.data.datasets[1].data = data.miner.fan2 || [];
+                charts.chartFan.data.datasets[2].data = data.miner.fan3 || [];
+                charts.chartFan.data.datasets[3].data = data.miner.fan4 || [];
                 charts.chartFan.update();
             }
 
