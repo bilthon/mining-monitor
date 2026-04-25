@@ -216,6 +216,7 @@ def api_live():
                     miner_data = {
                         'ghs_5s': float(miner_row[1]),
                         'ghs_avg': float(miner_row[2]),
+                        'ghs_30m': float(miner_row[3] or 0),
                         'temp1': int(temp_row[0] or 0),
                         'temp2': int(temp_row[1] or 0),
                         'temp3': int(temp_row[2] or 0),
@@ -231,6 +232,7 @@ def api_live():
                         'hardware_errors': int(miner_row[7]),
                         'utility': float(miner_row[8]),
                         'elapsed': int(miner_row[9]),
+                        'pool_rejected_pct': float(miner_row[10] or 0),
                         'frequency': int(miner_row[11] or 0),
                     }
     except Exception as e:
@@ -262,7 +264,9 @@ def api_live():
                     'hardware_errors': int(miner.get('hardware_errors', 0)),
                     'utility': float(miner.get('utility', 0)),
                     'elapsed': int(miner.get('elapsed', 0)),
+                    'pool_rejected_pct': float(miner.get('pool_rejected_pct', 0)),
                     'frequency': int(miner.get('frequency', 0)),
+                    'ghs_30m': float(miner.get('ghs_30m', 0)),
                 }
         except Exception as e:
             app.logger.error(f"Error getting miner metrics from API: {e}")
