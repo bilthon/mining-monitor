@@ -449,18 +449,24 @@ def api_error_history():
     """Return hardware error rate history with per-interval deltas and restart markers."""
     range_param = request.args.get('range', '24h')
 
-    now = datetime.now()
-    if range_param == '7d':
-        cutoff = now - timedelta(days=7)
-        downsample = 4
-    elif range_param == '30d':
-        cutoff = now - timedelta(days=30)
-        downsample = 18
-    else:
-        cutoff = now - timedelta(hours=24)
-        downsample = 1
+    TARGET_POINTS = 300
+    now_epoch = int(datetime.now().timestamp())
 
-    cutoff_epoch = int(cutoff.timestamp())
+    if range_param == 'all':
+        try:
+            with DB_MANAGER.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT MIN(timestamp) FROM miner_metrics")
+                row = cursor.fetchone()
+                cutoff_epoch = row[0] if (row and row[0]) else now_epoch - 86400
+        except Exception:
+            cutoff_epoch = now_epoch - 86400
+    elif range_param == '7d':
+        cutoff_epoch = now_epoch - 7 * 86400
+    elif range_param == '30d':
+        cutoff_epoch = now_epoch - 30 * 86400
+    else:
+        cutoff_epoch = now_epoch - 86400
 
     try:
         with DB_MANAGER.get_connection() as conn:
@@ -490,6 +496,7 @@ def api_error_history():
     prev_elapsed = all_rows[0][2]
 
     in_range_rows = [r for r in all_rows if r[0] >= cutoff_epoch]
+    downsample = max(1, len(in_range_rows) // TARGET_POINTS)
     downsampled = [in_range_rows[i] for i in range(0, len(in_range_rows), downsample)]
 
     for row in downsampled:
@@ -531,74 +538,77 @@ def api_error_history():
 @app.route('/api/history')
 @login_required
 def api_history():
-    """Return historical data (SQLite primary, CSV fallback)"""
+    """Return historical data (SQLite primary, CSV fallback).
+
+    Downsampling uses SQL bucket-averaging: the time span is divided into
+    TARGET_POINTS equal buckets and AVG() is applied within each bucket.
+    This preserves the shape of the data regardless of range length.
+    """
     range_param = request.args.get('range', '24h')
+    TARGET_POINTS = 300
 
-    # Calculate cutoff time
-    now = datetime.now()
-    if range_param == '24h':
-        cutoff = now - timedelta(hours=24)
-        downsample = 1
+    now_epoch = int(datetime.now().timestamp())
+
+    if range_param == 'all':
+        try:
+            with DB_MANAGER.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT MIN(timestamp) FROM miner_metrics")
+                row = cursor.fetchone()
+                cutoff_epoch = row[0] if (row and row[0]) else now_epoch - 86400
+        except Exception:
+            cutoff_epoch = now_epoch - 86400
     elif range_param == '7d':
-        cutoff = now - timedelta(days=7)
-        downsample = 4  # Every ~20 minutes
+        cutoff_epoch = now_epoch - 7 * 86400
     elif range_param == '30d':
-        cutoff = now - timedelta(days=30)
-        downsample = 18  # Every ~90 minutes
+        cutoff_epoch = now_epoch - 30 * 86400
     else:
-        cutoff = now - timedelta(hours=24)
-        downsample = 1
+        cutoff_epoch = now_epoch - 86400
 
-    cutoff_epoch = int(cutoff.timestamp())
+    span = max(1, now_epoch - cutoff_epoch)
+    # Each bucket is at least one raw reading interval (300 s)
+    bucket_size = max(300, span // TARGET_POINTS)
+    downsample = max(1, bucket_size // 300)  # stride for CSV fallback
+    cutoff = datetime.fromtimestamp(cutoff_epoch)
+
     data = {'miner': {}, 'sensor': {}}
 
     # ===== MINER DATA (Try SQLite first) =====
     try:
         with DB_MANAGER.get_connection() as conn:
             cursor = conn.cursor()
-
-            # Query miner metrics with downsampling in Python
             cursor.execute("""
-                SELECT mm.timestamp, mm.ghs_avg, mm.ghs_5s, mm.ghs_30m,
-                       mt.temp_max, mt.temp1, mt.temp2, mt.temp3,
-                       mf.fan1, mf.fan2, mf.fan3, mf.fan4
+                SELECT
+                    (mm.timestamp / ?) * ? AS bucket_ts,
+                    AVG(mm.ghs_avg), AVG(mm.ghs_5s), AVG(mm.ghs_30m),
+                    AVG(COALESCE(mt.temp_max, 0)), AVG(COALESCE(mt.temp1, 0)),
+                    AVG(COALESCE(mt.temp2, 0)), AVG(COALESCE(mt.temp3, 0)),
+                    AVG(COALESCE(mf.fan1, 0)), AVG(COALESCE(mf.fan2, 0)),
+                    AVG(COALESCE(mf.fan3, 0)), AVG(COALESCE(mf.fan4, 0))
                 FROM miner_metrics mm
                 LEFT JOIN miner_temperatures mt ON mm.timestamp = mt.timestamp AND mt.miner_id = 1
                 LEFT JOIN miner_fans mf ON mm.timestamp = mf.timestamp AND mf.miner_id = 1
                 WHERE mm.timestamp >= ?
-                ORDER BY mm.timestamp ASC
-            """, (cutoff_epoch,))
+                GROUP BY (mm.timestamp / ?)
+                ORDER BY bucket_ts ASC
+            """, (bucket_size, bucket_size, cutoff_epoch, bucket_size))
 
             rows = cursor.fetchall()
 
             if rows:
-                # Apply downsampling
-                downsampled_rows = [rows[i] for i in range(0, len(rows), downsample)]
+                labels, ghs_avg_list, ghs_5s_list, ghs_30m_list = [], [], [], []
+                temp_max_list, temp_lists, fan_lists = [], [[], [], []], [[], [], [], []]
 
-                labels = []
-                ghs_avg_list = []
-                ghs_5s_list = []
-                ghs_30m_list = []
-                temp_max_list = []
-                temp_lists = [[], [], []]
-                fan_lists = [[], [], [], []]
-
-                for row in downsampled_rows:
-                    timestamp_epoch = row[0]
-                    ghs_avg, ghs_5s, ghs_30m = row[1], row[2], row[3]
-                    temp_max, temp1, temp2, temp3 = row[4], row[5], row[6], row[7]
-                    fan_vals = [int(row[8] or 0), int(row[9] or 0), int(row[10] or 0), int(row[11] or 0)]
-
-                    label = epoch_to_csv_timestamp(timestamp_epoch)
-                    labels.append(label)
-                    ghs_avg_list.append(float(ghs_avg))
-                    ghs_5s_list.append(float(ghs_5s))
-                    ghs_30m_list.append(float(ghs_30m))
-                    temp_max_list.append(int(temp_max or 0))
-                    for i, t in enumerate([temp1, temp2, temp3]):
-                        temp_lists[i].append(int(t or 0))
-                    for i, v in enumerate(fan_vals):
-                        fan_lists[i].append(v)
+                for row in rows:
+                    labels.append(epoch_to_csv_timestamp(row[0]))
+                    ghs_avg_list.append(float(row[1]))
+                    ghs_5s_list.append(float(row[2]))
+                    ghs_30m_list.append(float(row[3]))
+                    temp_max_list.append(round(float(row[4])))
+                    for i in range(3):
+                        temp_lists[i].append(round(float(row[5 + i])))
+                    for i in range(4):
+                        fan_lists[i].append(round(float(row[8 + i])))
 
                 if labels:
                     data['miner']['labels'] = labels
@@ -613,7 +623,6 @@ def api_history():
 
     except Exception as e:
         app.logger.warning(f"SQLite query failed for miner history: {e}")
-        # Fall through to CSV fallback
 
     # CSV Fallback for miner data
     if not data['miner']:
@@ -647,44 +656,25 @@ def api_history():
     try:
         with DB_MANAGER.get_connection() as conn:
             cursor = conn.cursor()
-
-            # Query sensor readings with downsampling in Python
             cursor.execute("""
-                SELECT timestamp, temperature_c, humidity_pct
+                SELECT
+                    (timestamp / ?) * ? AS bucket_ts,
+                    AVG(temperature_c), AVG(humidity_pct)
                 FROM sensor_readings
                 WHERE timestamp >= ?
-                ORDER BY timestamp ASC
-            """, (cutoff_epoch,))
+                GROUP BY (timestamp / ?)
+                ORDER BY bucket_ts ASC
+            """, (bucket_size, bucket_size, cutoff_epoch, bucket_size))
 
             rows = cursor.fetchall()
 
             if rows:
-                # Apply downsampling
-                downsampled_rows = [rows[i] for i in range(0, len(rows), downsample)]
-
-                labels = []
-                temp_list = []
-                humidity_list = []
-
-                for row in downsampled_rows:
-                    timestamp_epoch = row[0]
-                    temperature = row[1]
-                    humidity = row[2]
-
-                    # Convert epoch back to CSV format
-                    label = epoch_to_csv_timestamp(timestamp_epoch)
-                    labels.append(label)
-                    temp_list.append(float(temperature))
-                    humidity_list.append(float(humidity))
-
-                if labels:
-                    data['sensor']['labels'] = labels
-                    data['sensor']['temperature'] = temp_list
-                    data['sensor']['humidity'] = humidity_list
+                data['sensor']['labels'] = [epoch_to_csv_timestamp(row[0]) for row in rows]
+                data['sensor']['temperature'] = [float(row[1]) for row in rows]
+                data['sensor']['humidity'] = [float(row[2]) for row in rows]
 
     except Exception as e:
         app.logger.warning(f"SQLite query failed for sensor history: {e}")
-        # Fall through to CSV fallback
 
     # CSV Fallback for sensor data
     if not data['sensor']:
