@@ -703,6 +703,31 @@ def api_history():
 
     return jsonify(data)
 
+@app.route('/api/watchdog')
+@login_required
+def api_watchdog():
+    """Return watchdog state: last auto-reboot timestamp and total reboot count."""
+    state_file = os.path.join(DATA_DIR, 'watchdog_state.json')
+    if not os.path.exists(state_file):
+        return jsonify({'last_reboot_ts': None, 'reboot_count': 0, 'last_reboot_str': 'Never'})
+    try:
+        with open(state_file) as f:
+            state = json.load(f)
+        last_ts = state.get('last_reboot_ts')
+        if last_ts:
+            last_reboot_str = datetime.fromtimestamp(last_ts).strftime('%Y-%m-%d %H:%M')
+        else:
+            last_reboot_str = 'Never'
+        return jsonify({
+            'last_reboot_ts': last_ts,
+            'reboot_count': state.get('reboot_count', 0),
+            'last_reboot_str': last_reboot_str,
+        })
+    except Exception as e:
+        app.logger.error(f"Error reading watchdog state: {e}")
+        return jsonify({'last_reboot_ts': None, 'reboot_count': 0, 'last_reboot_str': 'Never'})
+
+
 # ===== Setup Mode =====
 def setup_credentials():
     """Generate dashboard_config.py with hashed credentials"""

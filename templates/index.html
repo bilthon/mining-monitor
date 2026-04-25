@@ -289,6 +289,15 @@
                     </div>
                 </div>
             </div>
+            <div class="col-6 col-md-3 mb-3">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="card-title">Auto-Reboot</div>
+                        <div class="card-value" id="stat-watchdog-last" style="font-size: 1.1rem; line-height: 1.3;">—</div>
+                        <small class="text-muted"><span id="stat-watchdog-count">0</span> total auto-reboots</small>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Thermal Grid Panel -->
@@ -743,6 +752,16 @@
                 .catch(() => updateStatCards(null));
         }
 
+        function refreshWatchdog() {
+            fetch('/api/watchdog')
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById('stat-watchdog-last').textContent = data.last_reboot_str || 'Never';
+                    document.getElementById('stat-watchdog-count').textContent = data.reboot_count || 0;
+                })
+                .catch(() => {});
+        }
+
         function loadHistory(range) {
             fetch(`/api/history?range=${range}`)
                 .then(r => r.json())
@@ -790,9 +809,11 @@
             loadHistory('24h');
             refreshLive();
             refreshThermalGrid();
+            refreshWatchdog();
             // Refresh every 30 seconds (synchronized with live data)
             setInterval(refreshLive, 30000);
             setInterval(refreshThermalGrid, 30000);
+            setInterval(refreshWatchdog, 30000);
         });
 
         document.querySelectorAll('input[name="range"]').forEach(radio => {
