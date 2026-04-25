@@ -575,12 +575,45 @@
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
     <script>
+        let currentRange = '24h';
+
+        const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+        function formatAxisLabel(isoStr, range) {
+            if (!isoStr) return '';
+            const d = new Date(isoStr.replace(' ', 'T'));
+            if (isNaN(d.getTime())) return isoStr;
+            const hh = String(d.getHours()).padStart(2, '0');
+            const mm = String(d.getMinutes()).padStart(2, '0');
+            const mon = MONTHS[d.getMonth()];
+            const day = d.getDate();
+            const yr  = String(d.getFullYear()).slice(-2);
+            switch (range) {
+                case '24h': return `${hh}:${mm}`;
+                case '7d':  return `${mon} ${day}`;
+                case '30d': return `${mon} ${day}`;
+                case 'all': return `${mon} '${yr}`;
+                default:    return `${hh}:${mm}`;
+            }
+        }
+
         const chartDefaults = {
             responsive: true,
             maintainAspectRatio: false,
             plugins: { legend: { labels: { color: '#8b949e' } } },
             scales: {
-                x: { ticks: { color: '#8b949e' }, grid: { color: '#30363d' } },
+                x: {
+                    ticks: {
+                        color: '#8b949e',
+                        maxTicksLimit: 8,
+                        maxRotation: 0,
+                        autoSkip: true,
+                        callback: function(value) {
+                            return formatAxisLabel(this.getLabelForValue(value), currentRange);
+                        }
+                    },
+                    grid: { color: '#30363d' }
+                },
                 y: { ticks: { color: '#8b949e' }, grid: { color: '#30363d' } }
             }
         };
@@ -913,6 +946,7 @@
 
         document.querySelectorAll('input[name="range"]').forEach(radio => {
             radio.addEventListener('change', (e) => {
+                currentRange = e.target.value;
                 loadHistory(e.target.value);
             });
         });
