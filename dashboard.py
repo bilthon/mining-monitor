@@ -181,7 +181,8 @@ def api_live():
             # Query latest miner_metrics
             cursor.execute("""
                 SELECT timestamp, ghs_5s, ghs_avg, ghs_30m, accepted, rejected,
-                       rejection_pct, hardware_errors, utility, elapsed, pool_rejected_pct
+                       rejection_pct, hardware_errors, utility, elapsed, pool_rejected_pct,
+                       frequency
                 FROM miner_metrics
                 ORDER BY timestamp DESC
                 LIMIT 1
@@ -230,6 +231,7 @@ def api_live():
                         'hardware_errors': int(miner_row[7]),
                         'utility': float(miner_row[8]),
                         'elapsed': int(miner_row[9]),
+                        'frequency': int(miner_row[11] or 0),
                     }
     except Exception as e:
         app.logger.warning(f"SQLite query failed for miner data: {e}")
@@ -260,6 +262,7 @@ def api_live():
                     'hardware_errors': int(miner.get('hardware_errors', 0)),
                     'utility': float(miner.get('utility', 0)),
                     'elapsed': int(miner.get('elapsed', 0)),
+                    'frequency': int(miner.get('frequency', 0)),
                 }
         except Exception as e:
             app.logger.error(f"Error getting miner metrics from API: {e}")

@@ -298,6 +298,24 @@
                     </div>
                 </div>
             </div>
+            <div class="col-6 col-md-3 mb-3">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="card-title">Utility</div>
+                        <div class="card-value" id="stat-utility">—</div>
+                        <small class="text-muted">shares / min</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3 mb-3">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="card-title">Frequency</div>
+                        <div class="card-value" id="stat-frequency">—</div>
+                        <small class="text-muted">MHz</small>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Thermal Grid Panel -->
@@ -597,8 +615,10 @@
                 document.getElementById('stat-rejection').textContent = data.miner.rejection_pct ? data.miner.rejection_pct.toFixed(2) : '—';
                 document.getElementById('stat-hw-errors').textContent = data.miner.hardware_errors ?? '—';
                 document.getElementById('stat-uptime').textContent = fmtUptime(data.miner.elapsed);
+                document.getElementById('stat-utility').textContent = data.miner.utility != null ? data.miner.utility.toFixed(2) : '—';
+                document.getElementById('stat-frequency').textContent = data.miner.frequency || '—';
             } else {
-                ['stat-ghs', 'stat-temp', 'stat-fan', 'stat-accepted', 'stat-rejected', 'stat-rejection', 'stat-hw-errors', 'stat-uptime'].forEach(id => {
+                ['stat-ghs', 'stat-temp', 'stat-fan', 'stat-accepted', 'stat-rejected', 'stat-rejection', 'stat-hw-errors', 'stat-uptime', 'stat-utility', 'stat-frequency'].forEach(id => {
                     document.getElementById(id).textContent = '—';
                 });
             }
