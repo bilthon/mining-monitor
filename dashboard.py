@@ -797,6 +797,45 @@ def api_pool_rewards():
         return jsonify({'labels': [], 'total_reward': [], 'mining_reward': []})
 
 
+@app.route('/api/energy-costs')
+@login_required
+def api_energy_costs():
+    """Return daily pool rewards vs electricity cost in sats for the stacked bar chart."""
+    try:
+        with DB_MANAGER.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT
+                    pdr.date,
+                    ROUND(pdr.total_reward_btc * 100000000) AS sats_earned,
+                    ROUND(de.cost_sats)                     AS cost_sats
+                FROM pool_daily_rewards pdr
+                LEFT JOIN daily_energy de
+                       ON de.date = pdr.date AND de.is_complete = 1
+                ORDER BY pdr.date ASC
+            """)
+            rows = cursor.fetchall()
+        if not rows:
+            return jsonify({'labels': [], 'sats_earned': [], 'cost_sats': [], 'net_sats': []})
+        labels, sats_earned, cost_sats, net_sats = [], [], [], []
+        for r in rows:
+            labels.append(epoch_to_csv_timestamp(r[0]))
+            earned = int(r[1]) if r[1] is not None else 0
+            cost   = int(r[2]) if r[2] is not None else None
+            sats_earned.append(earned)
+            cost_sats.append(cost)
+            net_sats.append(earned - cost if cost is not None else earned)
+        return jsonify({
+            'labels':      labels,
+            'sats_earned': sats_earned,
+            'cost_sats':   cost_sats,
+            'net_sats':    net_sats,
+        })
+    except Exception as e:
+        app.logger.warning(f"energy-costs query failed: {e}")
+        return jsonify({'labels': [], 'sats_earned': [], 'cost_sats': [], 'net_sats': []})
+
+
 @app.route('/api/watchdog')
 @login_required
 def api_watchdog():

@@ -99,6 +99,49 @@ CREATE TABLE IF NOT EXISTS chain_temperatures (
 );
 """
 
+CREATE_POOL_STATS = """
+CREATE TABLE IF NOT EXISTS pool_stats (
+    timestamp            INTEGER PRIMARY KEY,
+    hash_rate_5m_ghs     REAL NOT NULL,
+    hash_rate_60m_ghs    REAL NOT NULL,
+    hash_rate_24h_ghs    REAL NOT NULL,
+    today_reward_btc     REAL NOT NULL,
+    estimated_reward_btc REAL NOT NULL,
+    current_balance_btc  REAL NOT NULL,
+    ok_workers           INTEGER NOT NULL,
+    low_workers          INTEGER NOT NULL,
+    off_workers          INTEGER NOT NULL,
+    dis_workers          INTEGER NOT NULL,
+    shares_5m            INTEGER NOT NULL,
+    shares_60m           INTEGER NOT NULL
+);
+"""
+
+CREATE_POOL_DAILY_REWARDS = """
+CREATE TABLE IF NOT EXISTS pool_daily_rewards (
+    date              INTEGER PRIMARY KEY,
+    total_reward_btc  REAL NOT NULL,
+    mining_reward_btc REAL NOT NULL,
+    fetched_at        INTEGER NOT NULL
+);
+"""
+
+CREATE_DAILY_ENERGY = """
+CREATE TABLE IF NOT EXISTS daily_energy (
+    date          INTEGER PRIMARY KEY,  -- Unix epoch UTC midnight
+    kwh           REAL,                 -- kWh consumed (NULL if coverage < 80%)
+    cost_pyg      REAL,                 -- kwh * 435.51
+    btc_usd_price REAL,                 -- BTC/USD price used
+    usd_pyg_rate  REAL,                 -- USD/PYG rate used
+    cost_usd      REAL,
+    cost_btc      REAL,
+    cost_sats     REAL,
+    coverage_pct  REAL,                 -- fraction of 288 expected 5-min slots with data
+    is_complete   INTEGER NOT NULL DEFAULT 0,
+    fetched_at    INTEGER NOT NULL
+);
+"""
+
 
 def get_all_create_statements() -> List[str]:
     """
@@ -114,6 +157,9 @@ def get_all_create_statements() -> List[str]:
         CREATE_MINER_FANS,
         CREATE_CHAIN_METRICS,
         CREATE_CHAIN_TEMPERATURES,
+        CREATE_POOL_STATS,
+        CREATE_POOL_DAILY_REWARDS,
+        CREATE_DAILY_ENERGY,
     ]
 
 
@@ -231,6 +277,49 @@ def set_performance_pragmas(conn: sqlite3.Connection) -> None:
 
     for pragma in pragmas:
         conn.execute(pragma)
+
+
+def apply_pool_tables_migration(db_path: str) -> None:
+    """
+    Create pool_stats and pool_daily_rewards tables if they don't exist.
+    Safe to run multiple times (CREATE TABLE IF NOT EXISTS).
+    """
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    try:
+        cursor.execute(CREATE_POOL_STATS)
+        cursor.execute(CREATE_POOL_DAILY_REWARDS)
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_pool_stats_ts "
+            "ON pool_stats(timestamp DESC);"
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_pool_rewards_date "
+            "ON pool_daily_rewards(date DESC);"
+        )
+        conn.commit()
+    finally:
+        cursor.close()
+        conn.close()
+
+
+def apply_daily_energy_migration(db_path: str) -> None:
+    """
+    Create daily_energy table and index if they don't exist.
+    Safe to run multiple times (CREATE TABLE IF NOT EXISTS).
+    """
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    try:
+        cursor.execute(CREATE_DAILY_ENERGY)
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_daily_energy_date "
+            "ON daily_energy(date DESC);"
+        )
+        conn.commit()
+    finally:
+        cursor.close()
+        conn.close()
 
 
 def apply_power_metrics_migration(db_path: str) -> None:

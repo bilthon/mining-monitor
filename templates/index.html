@@ -539,6 +539,18 @@
                 </div>
             </div>
         </div>
+        <div class="row">
+            <div class="col-12 mb-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="card-title mb-3">Earnings vs Electricity Cost (sats)</h6>
+                        <div class="chart-container">
+                            <canvas id="chartEnergyCosts"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
     </div> <!-- /tab-pane rewards -->
 
@@ -853,6 +865,65 @@
                     }
                 }
             );
+
+            charts.chartEnergyCosts = new Chart(
+                document.getElementById('chartEnergyCosts').getContext('2d'),
+                {
+                    type: 'bar',
+                    data: { labels: [], datasets: [
+                        {
+                            label: 'Net Profit (sats)',
+                            data: [],
+                            backgroundColor: '#3fb95099',
+                            borderColor: '#3fb950',
+                            borderWidth: 1,
+                            stack: 'energy',
+                        },
+                        {
+                            label: 'Electricity Cost (sats)',
+                            data: [],
+                            backgroundColor: '#f8514999',
+                            borderColor: '#f85149',
+                            borderWidth: 1,
+                            stack: 'energy',
+                        }
+                    ]},
+                    options: {
+                        ...chartDefaults,
+                        plugins: {
+                            legend: { labels: { color: '#8b949e' } },
+                            tooltip: {
+                                callbacks: {
+                                    label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y != null ? ctx.parsed.y.toLocaleString() : '—'} sats`
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                stacked: true,
+                                ticks: {
+                                    color: '#8b949e',
+                                    maxTicksLimit: 10,
+                                    maxRotation: 0,
+                                    autoSkip: true,
+                                    callback: function(value) {
+                                        return this.getLabelForValue(value);
+                                    }
+                                },
+                                grid: { color: '#30363d' }
+                            },
+                            y: {
+                                stacked: true,
+                                ticks: {
+                                    color: '#8b949e',
+                                    callback: v => v.toLocaleString()
+                                },
+                                grid: { color: '#30363d' }
+                            }
+                        }
+                    }
+                }
+            );
         }
 
         function fmtUptime(seconds) {
@@ -1140,6 +1211,23 @@
                 .catch(e => console.error('Error loading pool rewards:', e));
         }
 
+        function refreshEnergyCosts() {
+            fetch('/api/energy-costs')
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.labels || data.labels.length === 0) return;
+                    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                    charts.chartEnergyCosts.data.labels = data.labels.map(l => {
+                        const parts = l.split(/[- :]/);
+                        return `${months[parseInt(parts[1], 10) - 1]} ${parseInt(parts[2], 10)}`;
+                    });
+                    charts.chartEnergyCosts.data.datasets[0].data = data.net_sats;
+                    charts.chartEnergyCosts.data.datasets[1].data = data.cost_sats;
+                    charts.chartEnergyCosts.update();
+                })
+                .catch(e => console.error('Error loading energy costs:', e));
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             initCharts();
             loadHistory('24h');
@@ -1147,11 +1235,13 @@
             refreshThermalGrid();
             refreshWatchdog();
             refreshPoolRewards();
+            refreshEnergyCosts();
             // Refresh every 30 seconds (synchronized with live data)
             setInterval(refreshLive, 30000);
             setInterval(refreshThermalGrid, 30000);
             setInterval(refreshWatchdog, 30000);
             setInterval(refreshPoolRewards, 3600000);
+            setInterval(refreshEnergyCosts, 3600000);
         });
 
         document.querySelectorAll('input[name="range"]').forEach(radio => {
