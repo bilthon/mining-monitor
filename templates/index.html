@@ -266,6 +266,9 @@
                 <button class="nav-link active" id="tab-overview-btn" data-bs-toggle="tab" data-bs-target="#tab-overview" type="button">Overview</button>
             </li>
             <li class="nav-item">
+                <button class="nav-link" id="tab-thermal-btn" data-bs-toggle="tab" data-bs-target="#tab-thermal" type="button">Thermal Grid</button>
+            </li>
+            <li class="nav-item">
                 <button class="nav-link" id="tab-errors-btn" data-bs-toggle="tab" data-bs-target="#tab-errors" type="button">Hardware Errors</button>
             </li>
         </ul>
@@ -402,36 +405,6 @@
 
         </div>
 
-        <!-- Thermal Grid Panel -->
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-body">
-                        <h6 class="card-title mb-3">Thermal Grid: Chain Temperature Sensors (36 Sensors)</h6>
-                        <div class="thermal-grid-container">
-                            <div id="thermalGridContainer">
-                                <div style="text-align: center; color: #8b949e; padding: 2rem;">Loading thermal data...</div>
-                            </div>
-                        </div>
-                        <div class="thermal-stats">
-                            <div class="thermal-stat-card">
-                                <div class="thermal-stat-label">Maximum Temperature</div>
-                                <div class="thermal-stat-value" id="thermalMaxTemp">—</div>
-                            </div>
-                            <div class="thermal-stat-card">
-                                <div class="thermal-stat-label">Minimum Temperature</div>
-                                <div class="thermal-stat-value" id="thermalMinTemp">—</div>
-                            </div>
-                            <div class="thermal-stat-card">
-                                <div class="thermal-stat-label">Average Temperature</div>
-                                <div class="thermal-stat-value" id="thermalAvgTemp">—</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <!-- Charts -->
         <div class="row">
             <div class="col-12 mb-4">
@@ -493,6 +466,40 @@
         </div>
     </div>
     </div> <!-- /tab-pane overview -->
+
+    <!-- ===== THERMAL GRID TAB ===== -->
+    <div class="tab-pane fade" id="tab-thermal">
+    <div class="container-fluid p-4">
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="card-title mb-3">Chain Temperature Sensors (36 Sensors)</h6>
+                        <div class="thermal-grid-container">
+                            <div id="thermalGridContainer">
+                                <div style="text-align: center; color: #8b949e; padding: 2rem;">Loading thermal data...</div>
+                            </div>
+                        </div>
+                        <div class="thermal-stats">
+                            <div class="thermal-stat-card">
+                                <div class="thermal-stat-label">Maximum Temperature</div>
+                                <div class="thermal-stat-value" id="thermalMaxTemp">—</div>
+                            </div>
+                            <div class="thermal-stat-card">
+                                <div class="thermal-stat-label">Minimum Temperature</div>
+                                <div class="thermal-stat-value" id="thermalMinTemp">—</div>
+                            </div>
+                            <div class="thermal-stat-card">
+                                <div class="thermal-stat-label">Average Temperature</div>
+                                <div class="thermal-stat-value" id="thermalAvgTemp">—</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    </div> <!-- /tab-pane thermal -->
 
     <!-- ===== ERRORS TAB ===== -->
     <div class="tab-pane fade" id="tab-errors">
