@@ -588,7 +588,8 @@ def api_history():
                     AVG(COALESCE(mt.temp_max, 0)), AVG(COALESCE(mt.temp1, 0)),
                     AVG(COALESCE(mt.temp2, 0)), AVG(COALESCE(mt.temp3, 0)),
                     AVG(COALESCE(mf.fan1, 0)), AVG(COALESCE(mf.fan2, 0)),
-                    AVG(COALESCE(mf.fan3, 0)), AVG(COALESCE(mf.fan4, 0))
+                    AVG(COALESCE(mf.fan3, 0)), AVG(COALESCE(mf.fan4, 0)),
+                    AVG(mm.watt_actual), AVG(mm.efficiency_jt)
                 FROM miner_metrics mm
                 LEFT JOIN miner_temperatures mt ON mm.timestamp = mt.timestamp AND mt.miner_id = 1
                 LEFT JOIN miner_fans mf ON mm.timestamp = mf.timestamp AND mf.miner_id = 1
@@ -602,6 +603,7 @@ def api_history():
             if rows:
                 labels, ghs_avg_list, ghs_5s_list, ghs_30m_list = [], [], [], []
                 temp_max_list, temp_lists, fan_lists = [], [[], [], []], [[], [], [], []]
+                watt_list, jt_list = [], []
 
                 for row in rows:
                     labels.append(epoch_to_csv_timestamp(row[0]))
@@ -613,6 +615,8 @@ def api_history():
                         temp_lists[i].append(round(float(row[5 + i])))
                     for i in range(4):
                         fan_lists[i].append(round(float(row[8 + i])))
+                    watt_list.append(round(float(row[12]), 1) if row[12] is not None else None)
+                    jt_list.append(round(float(row[13]), 2) if row[13] is not None else None)
 
                 if labels:
                     data['miner']['labels'] = labels
@@ -624,6 +628,8 @@ def api_history():
                         data['miner'][f'temp{i+1}'] = tl
                     for i, fl in enumerate(fan_lists):
                         data['miner'][f'fan{i+1}'] = fl
+                    data['miner']['watt_actual'] = watt_list
+                    data['miner']['efficiency_jt'] = jt_list
 
     except Exception as e:
         app.logger.warning(f"SQLite query failed for miner history: {e}")

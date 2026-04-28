@@ -423,6 +423,29 @@
             <div class="col-md-6 mb-4">
                 <div class="card">
                     <div class="card-body">
+                        <h6 class="card-title mb-3">Power (W)</h6>
+                        <div class="chart-container">
+                            <canvas id="chartPower"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 mb-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="card-title mb-3">Efficiency (J/TH)</h6>
+                        <div class="chart-container">
+                            <canvas id="chartEfficiency"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6 mb-4">
+                <div class="card">
+                    <div class="card-body">
                         <h6 class="card-title mb-3">Miner Temperatures (°C)</h6>
                         <div class="chart-container">
                             <canvas id="chartMinerTemp"></canvas>
@@ -671,6 +694,18 @@
                         { label: 'Fan 4', data: [], borderColor: '#3fb950', tension: 0.1, pointRadius: 0 },
                     ]},
                 },
+                chartPower: {
+                    type: 'line',
+                    data: { labels: [], datasets: [
+                        { label: 'Power (W)', data: [], borderColor: '#ffa657', tension: 0.1, pointRadius: 0, spanGaps: true },
+                    ]},
+                },
+                chartEfficiency: {
+                    type: 'line',
+                    data: { labels: [], datasets: [
+                        { label: 'Efficiency (J/TH)', data: [], borderColor: '#d2a8ff', tension: 0.1, pointRadius: 0, spanGaps: true },
+                    ]},
+                },
                 chartRoomTemp: {
                     type: 'line',
                     data: { labels: [], datasets: [{ label: 'Temp', data: [], borderColor: '#79c0ff', tension: 0.1 }] },
@@ -791,6 +826,14 @@
                 charts.chartFan.data.datasets[2].data = data.miner.fan3 || [];
                 charts.chartFan.data.datasets[3].data = data.miner.fan4 || [];
                 charts.chartFan.update();
+
+                charts.chartPower.data.labels = data.miner.labels;
+                charts.chartPower.data.datasets[0].data = data.miner.watt_actual || [];
+                charts.chartPower.update();
+
+                charts.chartEfficiency.data.labels = data.miner.labels;
+                charts.chartEfficiency.data.datasets[0].data = data.miner.efficiency_jt || [];
+                charts.chartEfficiency.update();
             }
 
             if (data.sensor && data.sensor.labels) {
