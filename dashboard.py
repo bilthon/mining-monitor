@@ -326,6 +326,42 @@ def api_live():
     if sensor_data:
         data['sensor'] = sensor_data
 
+    # ===== GET POOL DATA =====
+    pool_data = None
+    try:
+        with DB_MANAGER.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT timestamp, hash_rate_5m_ghs, hash_rate_60m_ghs,
+                       hash_rate_24h_ghs, today_reward_btc, estimated_reward_btc,
+                       current_balance_btc, ok_workers, low_workers, off_workers,
+                       dis_workers, shares_5m, shares_60m
+                FROM pool_stats
+                ORDER BY timestamp DESC
+                LIMIT 1
+            """)
+            row = cursor.fetchone()
+            if row:
+                pool_data = {
+                    'hash_rate_5m_ghs':       round(float(row[1]), 2),
+                    'hash_rate_60m_ghs':      round(float(row[2]), 2),
+                    'hash_rate_24h_ghs':      round(float(row[3]), 2),
+                    'today_reward_btc':        float(row[4]),
+                    'estimated_reward_btc':    float(row[5]),
+                    'current_balance_btc':     float(row[6]),
+                    'ok_workers':              int(row[7]),
+                    'low_workers':             int(row[8]),
+                    'off_workers':             int(row[9]),
+                    'dis_workers':             int(row[10]),
+                    'shares_5m':               int(row[11]),
+                    'shares_60m':              int(row[12]),
+                }
+    except Exception as e:
+        app.logger.warning(f"SQLite query failed for pool data: {e}")
+
+    if pool_data:
+        data['pool'] = pool_data
+
     return jsonify(data)
 
 @app.route('/api/chain-temperatures')
@@ -575,7 +611,7 @@ def api_history():
     downsample = max(1, bucket_size // 300)  # stride for CSV fallback
     cutoff = datetime.fromtimestamp(cutoff_epoch)
 
-    data = {'miner': {}, 'sensor': {}}
+    data = {'miner': {}, 'sensor': {}, 'pool': {}}
 
     # ===== MINER DATA (Try SQLite first) =====
     try:
@@ -708,7 +744,58 @@ def api_history():
         except Exception as e:
             app.logger.error(f"Error reading sensor CSV fallback: {e}")
 
+    # ===== POOL HISTORY =====
+    try:
+        with DB_MANAGER.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT
+                    (timestamp / ?) * ? AS bucket_ts,
+                    AVG(hash_rate_5m_ghs),
+                    AVG(hash_rate_60m_ghs),
+                    AVG(today_reward_btc),
+                    AVG(estimated_reward_btc)
+                FROM pool_stats
+                WHERE timestamp >= ?
+                GROUP BY (timestamp / ?)
+                ORDER BY bucket_ts ASC
+            """, (bucket_size, bucket_size, cutoff_epoch, bucket_size))
+            rows = cursor.fetchall()
+            if rows:
+                data['pool']['labels']               = [epoch_to_csv_timestamp(r[0]) for r in rows]
+                data['pool']['hash_rate_5m_ghs']     = [round(float(r[1]), 2) for r in rows]
+                data['pool']['hash_rate_60m_ghs']    = [round(float(r[2]), 2) for r in rows]
+                data['pool']['today_reward_btc']     = [float(r[3]) for r in rows]
+                data['pool']['estimated_reward_btc'] = [float(r[4]) for r in rows]
+    except Exception as e:
+        app.logger.warning(f"SQLite query failed for pool history: {e}")
+
     return jsonify(data)
+
+@app.route('/api/pool-rewards')
+@login_required
+def api_pool_rewards():
+    """Return all pool_daily_rewards rows for the daily earnings bar chart."""
+    try:
+        with DB_MANAGER.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT date, total_reward_btc, mining_reward_btc
+                FROM pool_daily_rewards
+                ORDER BY date ASC
+            """)
+            rows = cursor.fetchall()
+        if not rows:
+            return jsonify({'labels': [], 'total_reward': [], 'mining_reward': []})
+        return jsonify({
+            'labels':        [epoch_to_csv_timestamp(r[0]) for r in rows],
+            'total_reward':  [float(r[1]) for r in rows],
+            'mining_reward': [float(r[2]) for r in rows],
+        })
+    except Exception as e:
+        app.logger.warning(f"pool-rewards query failed: {e}")
+        return jsonify({'labels': [], 'total_reward': [], 'mining_reward': []})
+
 
 @app.route('/api/watchdog')
 @login_required
