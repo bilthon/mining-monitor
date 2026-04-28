@@ -531,18 +531,6 @@
             <div class="col-12 mb-4">
                 <div class="card">
                     <div class="card-body">
-                        <h6 class="card-title mb-3">Daily Pool Rewards (sats)</h6>
-                        <div class="chart-container">
-                            <canvas id="chartPoolRewards"></canvas>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="row">
-            <div class="col-12 mb-4">
-                <div class="card">
-                    <div class="card-body">
                         <h6 class="card-title mb-3">Earnings vs Electricity Cost (sats)</h6>
                         <div class="chart-container">
                             <canvas id="chartEnergyCosts"></canvas>
@@ -817,52 +805,6 @@
                         pointRadius: 0,
                     }]},
                     options: { ...chartDefaults }
-                }
-            );
-
-            charts.chartPoolRewards = new Chart(
-                document.getElementById('chartPoolRewards').getContext('2d'),
-                {
-                    type: 'bar',
-                    data: { labels: [], datasets: [{
-                        label: 'Daily Reward (sats)',
-                        data: [],
-                        backgroundColor: '#ffa65799',
-                        borderColor: '#ffa657',
-                        borderWidth: 1,
-                    }]},
-                    options: {
-                        ...chartDefaults,
-                        plugins: {
-                            legend: { labels: { color: '#8b949e' } },
-                            tooltip: {
-                                callbacks: {
-                                    label: ctx => `${ctx.parsed.y.toLocaleString()} sats`
-                                }
-                            }
-                        },
-                        scales: {
-                            x: {
-                                ticks: {
-                                    color: '#8b949e',
-                                    maxTicksLimit: 10,
-                                    maxRotation: 0,
-                                    autoSkip: true,
-                                    callback: function(value) {
-                                        return this.getLabelForValue(value);
-                                    }
-                                },
-                                grid: { color: '#30363d' }
-                            },
-                            y: {
-                                ticks: {
-                                    color: '#8b949e',
-                                    callback: v => v.toLocaleString()
-                                },
-                                grid: { color: '#30363d' }
-                            }
-                        }
-                    }
                 }
             );
 
@@ -1194,23 +1136,6 @@
             }
         }
 
-        function refreshPoolRewards() {
-            fetch('/api/pool-rewards')
-                .then(r => r.json())
-                .then(data => {
-                    if (!data.labels || data.labels.length === 0) return;
-                    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-                    charts.chartPoolRewards.data.labels = data.labels.map(l => {
-                        // Parse "YYYY-MM-DD HH:MM:SS" by splitting to avoid timezone shifts
-                        const parts = l.split(/[- :]/);
-                        return `${months[parseInt(parts[1], 10) - 1]} ${parseInt(parts[2], 10)}`;
-                    });
-                    charts.chartPoolRewards.data.datasets[0].data = data.total_reward.map(v => Math.round(v * 1e8));
-                    charts.chartPoolRewards.update();
-                })
-                .catch(e => console.error('Error loading pool rewards:', e));
-        }
-
         function refreshEnergyCosts() {
             fetch('/api/energy-costs')
                 .then(r => r.json())
@@ -1234,13 +1159,11 @@
             refreshLive();
             refreshThermalGrid();
             refreshWatchdog();
-            refreshPoolRewards();
             refreshEnergyCosts();
             // Refresh every 30 seconds (synchronized with live data)
             setInterval(refreshLive, 30000);
             setInterval(refreshThermalGrid, 30000);
             setInterval(refreshWatchdog, 30000);
-            setInterval(refreshPoolRewards, 3600000);
             setInterval(refreshEnergyCosts, 3600000);
         });
 
