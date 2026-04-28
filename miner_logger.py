@@ -20,6 +20,8 @@ import logging
 from datetime import datetime
 import os
 import sqlite3
+import requests
+from requests.auth import HTTPDigestAuth
 
 # Phase 2: Import database utilities
 from db_utils import ConnectionManager, csv_timestamp_to_epoch, transaction
@@ -48,6 +50,9 @@ MINER_ID = 1  # Single miner in this system
 MINER_HOST = "192.168.18.7"
 MINER_PORT = 4028
 TIMEOUT = 5
+MINER_WEB_USER = "root"
+MINER_WEB_PASS = "root"
+HTTP_TIMEOUT = 5  # separate from TIMEOUT (CGMiner socket timeout)
 
 def query_cgminer(command):
     """Query CGMiner API and return JSON response"""
@@ -90,6 +95,43 @@ def query_cgminer(command):
     except Exception as e:
         logger.error(f"Error querying miner: {e}")
         return None
+
+def query_stats_http():
+    """
+    Query the Antminer T21 native HTTP API for power metrics (watt, jt).
+    Returns {"watt": float, "jt": float} or None on any failure.
+    Non-fatal: CGMiner collection continues regardless.
+    """
+    url = f"http://{MINER_HOST}/cgi-bin/stats.cgi"
+    try:
+        r = requests.get(
+            url,
+            auth=HTTPDigestAuth(MINER_WEB_USER, MINER_WEB_PASS),
+            timeout=HTTP_TIMEOUT,
+        )
+        r.raise_for_status()
+        payload = r.json()
+        stats_list = payload.get("STATS", [])
+        if not stats_list:
+            logger.warning("query_stats_http: empty STATS array in response")
+            return None
+        stats = stats_list[0]  # HTTP API: watt/jt are in STATS[0] (unlike CGMiner TCP which uses STATS[1])
+        watt = stats.get("watt")
+        jt = stats.get("jt")
+        if watt is None or jt is None:
+            logger.warning(f"query_stats_http: missing watt/jt in response: {list(stats.keys())}")
+            return None
+        return {"watt": float(watt), "jt": float(jt)}
+    except requests.exceptions.Timeout:
+        logger.warning(f"query_stats_http: timed out connecting to {url}")
+        return None
+    except requests.exceptions.ConnectionError:
+        logger.warning(f"query_stats_http: could not connect to {url}")
+        return None
+    except Exception as e:
+        logger.warning(f"query_stats_http: unexpected error: {e}")
+        return None
+
 
 def parse_temperature_string(temp_str):
     """
@@ -152,6 +194,11 @@ def get_miner_metrics():
             "pool_rejected_pct": summary.get("Pool Rejected%", 0),
         }
 
+        # Query native HTTP API for power metrics — non-fatal if unavailable
+        power_data = query_stats_http()
+        metrics["watt_actual"] = power_data["watt"] if power_data else None
+        metrics["efficiency_jt"] = power_data["jt"] if power_data else None
+
         # Phase 5: Extract chain temperature data
         # Parse detailed per-chain temperatures (3 chains × 3 sensor types × 4 readings)
         chain_temps = {}
@@ -211,8 +258,8 @@ def write_to_db(metrics: dict) -> bool:
                     INSERT OR IGNORE INTO miner_metrics
                     (timestamp, ghs_5s, ghs_avg, ghs_30m, accepted, rejected,
                      rejection_pct, hardware_errors, utility, elapsed,
-                     pool_rejected_pct, frequency)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     pool_rejected_pct, frequency, watt_actual, efficiency_jt)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     epoch,
                     metrics['ghs_5s'],
@@ -226,6 +273,8 @@ def write_to_db(metrics: dict) -> bool:
                     metrics['elapsed'],
                     metrics['pool_rejected_pct'],
                     metrics['frequency'],
+                    metrics.get('watt_actual'),
+                    metrics.get('efficiency_jt'),
                 ))
 
                 # Insert into miner_temperatures (child table)
@@ -340,13 +389,17 @@ def main():
 
             if metrics:
                 # Log to console/file
+                power_str = ""
+                if metrics.get('watt_actual') is not None:
+                    power_str = f", Power: {metrics['watt_actual']:.0f}W ({metrics['efficiency_jt']:.1f} J/TH)"
+
                 log_message = (
                     f"GH/s: {metrics['ghs_avg']:.2f} (5s: {metrics['ghs_5s']:.2f}), "
                     f"Temps: {metrics['temp1']}°C/{metrics['temp2']}°C/{metrics['temp3']}°C "
                     f"(max: {metrics['temp_max']}°C), "
                     f"Fans: {metrics['fan1']}/{metrics['fan2']}/{metrics['fan3']}/{metrics['fan4']} RPM, "
                     f"Shares: {metrics['accepted']}A/{metrics['rejected']}R "
-                    f"({metrics['rejection_pct']:.2f}%)"
+                    f"({metrics['rejection_pct']:.2f}%){power_str}"
                 )
                 logger.info(log_message)
 

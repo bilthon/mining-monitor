@@ -182,7 +182,7 @@ def api_live():
             cursor.execute("""
                 SELECT timestamp, ghs_5s, ghs_avg, ghs_30m, accepted, rejected,
                        rejection_pct, hardware_errors, utility, elapsed, pool_rejected_pct,
-                       frequency
+                       frequency, watt_actual, efficiency_jt
                 FROM miner_metrics
                 ORDER BY timestamp DESC
                 LIMIT 1
@@ -234,6 +234,8 @@ def api_live():
                         'elapsed': int(miner_row[9]),
                         'pool_rejected_pct': float(miner_row[10] or 0),
                         'frequency': int(miner_row[11] or 0),
+                        'watt_actual': float(miner_row[12]) if miner_row[12] is not None else None,
+                        'efficiency_jt': float(miner_row[13]) if miner_row[13] is not None else None,
                     }
     except Exception as e:
         app.logger.warning(f"SQLite query failed for miner data: {e}")
@@ -267,6 +269,8 @@ def api_live():
                     'pool_rejected_pct': float(miner.get('pool_rejected_pct', 0)),
                     'frequency': int(miner.get('frequency', 0)),
                     'ghs_30m': float(miner.get('ghs_30m', 0)),
+                    'watt_actual': miner.get('watt_actual'),
+                    'efficiency_jt': miner.get('efficiency_jt'),
                 }
         except Exception as e:
             app.logger.error(f"Error getting miner metrics from API: {e}")

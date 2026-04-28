@@ -41,7 +41,9 @@ CREATE TABLE IF NOT EXISTS miner_metrics (
     utility REAL NOT NULL,
     elapsed INTEGER NOT NULL,
     pool_rejected_pct REAL NOT NULL,
-    frequency INTEGER
+    frequency INTEGER,
+    watt_actual REAL DEFAULT NULL,
+    efficiency_jt REAL DEFAULT NULL
 );
 """
 
@@ -229,3 +231,26 @@ def set_performance_pragmas(conn: sqlite3.Connection) -> None:
 
     for pragma in pragmas:
         conn.execute(pragma)
+
+
+def apply_power_metrics_migration(db_path: str) -> None:
+    """
+    Add watt_actual and efficiency_jt columns to miner_metrics if missing.
+    Safe to run multiple times (idempotent via duplicate-column-name guard).
+    """
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    try:
+        for stmt in [
+            "ALTER TABLE miner_metrics ADD COLUMN watt_actual REAL DEFAULT NULL;",
+            "ALTER TABLE miner_metrics ADD COLUMN efficiency_jt REAL DEFAULT NULL;",
+        ]:
+            try:
+                cursor.execute(stmt)
+            except sqlite3.OperationalError as e:
+                if "duplicate column name" not in str(e):
+                    raise
+        conn.commit()
+    finally:
+        cursor.close()
+        conn.close()

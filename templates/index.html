@@ -384,6 +384,22 @@
                 </div>
             </div>
 
+            <!-- Power & Efficiency -->
+            <div class="stat-panel">
+                <div class="stat-panel-title">Power & Efficiency</div>
+                <div class="stat-panel-primary">
+                    <span class="stat-panel-value" id="stat-watt">—</span>
+                    <span class="stat-panel-unit">W</span>
+                </div>
+                <div class="stat-panel-secondary">
+                    <div class="stat-mini">
+                        <span class="stat-mini-label">Efficiency</span>
+                        <span class="stat-mini-value" id="stat-jt">—</span>
+                        <span class="stat-mini-unit">J/TH</span>
+                    </div>
+                </div>
+            </div>
+
         </div>
 
         <!-- Thermal Grid Panel -->
@@ -723,10 +739,12 @@
                 document.getElementById('stat-uptime').textContent = fmtUptime(data.miner.elapsed);
                 document.getElementById('stat-utility').textContent = data.miner.utility != null ? data.miner.utility.toFixed(2) : '—';
                 document.getElementById('stat-frequency').textContent = data.miner.frequency || '—';
+                document.getElementById('stat-watt').textContent = data.miner.watt_actual != null ? data.miner.watt_actual.toFixed(0) : '—';
+                document.getElementById('stat-jt').textContent = data.miner.efficiency_jt != null ? data.miner.efficiency_jt.toFixed(2) : '—';
             } else {
                 ['stat-ghs', 'stat-ghs-5s', 'stat-ghs-30m', 'stat-temp', 'stat-fan', 'stat-accepted',
                  'stat-rejected', 'stat-rejection', 'stat-pool-rejection', 'stat-hw-errors',
-                 'stat-uptime', 'stat-utility', 'stat-frequency'].forEach(id => {
+                 'stat-uptime', 'stat-utility', 'stat-frequency', 'stat-watt', 'stat-jt'].forEach(id => {
                     document.getElementById(id).textContent = '—';
                 });
             }
