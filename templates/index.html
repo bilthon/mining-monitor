@@ -403,6 +403,36 @@
                 </div>
             </div>
 
+            <!-- Pool Earnings -->
+            <div class="stat-panel">
+                <div class="stat-panel-title">Pool Earnings (Braiins)</div>
+                <div class="stat-panel-primary">
+                    <span class="stat-panel-value" id="stat-pool-today" style="font-size:1.4rem;">—</span>
+                    <span class="stat-panel-unit">BTC today</span>
+                </div>
+                <div class="stat-panel-secondary">
+                    <div class="stat-mini">
+                        <span class="stat-mini-label">Est.</span>
+                        <span class="stat-mini-value" id="stat-pool-est">—</span>
+                        <span class="stat-mini-unit">BTC</span>
+                    </div>
+                    <div class="stat-mini">
+                        <span class="stat-mini-label">Balance</span>
+                        <span class="stat-mini-value" id="stat-pool-balance">—</span>
+                        <span class="stat-mini-unit">BTC</span>
+                    </div>
+                    <div class="stat-mini">
+                        <span class="stat-mini-label">5m HR</span>
+                        <span class="stat-mini-value" id="stat-pool-hr5m">—</span>
+                        <span class="stat-mini-unit">GH/s</span>
+                    </div>
+                    <div class="stat-mini">
+                        <span class="stat-mini-label">Workers</span>
+                        <span class="stat-mini-value" id="stat-pool-workers">—</span>
+                    </div>
+                </div>
+            </div>
+
         </div>
 
         <!-- Charts -->
@@ -482,6 +512,19 @@
                         <h6 class="card-title mb-3">Room Humidity (%)</h6>
                         <div class="chart-container">
                             <canvas id="chartHumidity"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-12 mb-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="card-title mb-3">Daily Pool Rewards (BTC)</h6>
+                        <div class="chart-container">
+                            <canvas id="chartPoolRewards"></canvas>
                         </div>
                     </div>
                 </div>
@@ -674,6 +717,7 @@
                         { label: 'Avg (ghs_avg)', data: [], borderColor: '#58a6ff', tension: 0.1, pointRadius: 0 },
                         { label: 'Real (ghs_5s)', data: [], borderColor: '#3fb950', tension: 0.1, pointRadius: 0, borderDash: [4, 3], borderWidth: 1.5 },
                         { label: '30m avg', data: [], borderColor: '#ffa657', tension: 0.1, pointRadius: 0, borderWidth: 2 },
+                        { label: 'Pool 5m (Braiins)', data: [], borderColor: '#d2a8ff', tension: 0.1, pointRadius: 0, borderDash: [6, 4], borderWidth: 1.5, spanGaps: true },
                     ]},
                 },
                 chartMinerTemp: {
@@ -754,6 +798,52 @@
                     options: { ...chartDefaults }
                 }
             );
+
+            charts.chartPoolRewards = new Chart(
+                document.getElementById('chartPoolRewards').getContext('2d'),
+                {
+                    type: 'bar',
+                    data: { labels: [], datasets: [{
+                        label: 'Daily Reward (sats)',
+                        data: [],
+                        backgroundColor: '#ffa65799',
+                        borderColor: '#ffa657',
+                        borderWidth: 1,
+                    }]},
+                    options: {
+                        ...chartDefaults,
+                        plugins: {
+                            legend: { labels: { color: '#8b949e' } },
+                            tooltip: {
+                                callbacks: {
+                                    label: ctx => `${ctx.parsed.y.toLocaleString()} sats`
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                ticks: {
+                                    color: '#8b949e',
+                                    maxTicksLimit: 10,
+                                    maxRotation: 0,
+                                    autoSkip: true,
+                                    callback: function(value) {
+                                        return this.getLabelForValue(value);
+                                    }
+                                },
+                                grid: { color: '#30363d' }
+                            },
+                            y: {
+                                ticks: {
+                                    color: '#8b949e',
+                                    callback: v => v.toLocaleString()
+                                },
+                                grid: { color: '#30363d' }
+                            }
+                        }
+                    }
+                }
+            );
         }
 
         function fmtUptime(seconds) {
@@ -799,6 +889,27 @@
                 document.getElementById('stat-humidity').textContent = '—';
             }
 
+            if (data && data.pool) {
+                const p = data.pool;
+                document.getElementById('stat-pool-today').textContent =
+                    p.today_reward_btc != null ? p.today_reward_btc.toFixed(8) : '—';
+                document.getElementById('stat-pool-est').textContent =
+                    p.estimated_reward_btc != null ? p.estimated_reward_btc.toFixed(8) : '—';
+                document.getElementById('stat-pool-balance').textContent =
+                    p.current_balance_btc != null ? p.current_balance_btc.toFixed(8) : '—';
+                document.getElementById('stat-pool-hr5m').textContent =
+                    p.hash_rate_5m_ghs != null ? p.hash_rate_5m_ghs.toFixed(0) : '—';
+                document.getElementById('stat-pool-workers').textContent =
+                    p.ok_workers != null
+                        ? `${p.ok_workers}ok / ${p.low_workers}lo / ${p.off_workers}off`
+                        : '—';
+            } else {
+                ['stat-pool-today','stat-pool-est','stat-pool-balance',
+                 'stat-pool-hr5m','stat-pool-workers'].forEach(id => {
+                    document.getElementById(id).textContent = '—';
+                });
+            }
+
             const time = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
             document.getElementById('lastUpdated').textContent = `Last updated: ${time}`;
         }
@@ -811,6 +922,9 @@
                 charts.chartHashRate.data.datasets[0].data = data.miner.ghs_avg;
                 charts.chartHashRate.data.datasets[1].data = data.miner.ghs_5s || [];
                 charts.chartHashRate.data.datasets[2].data = data.miner.ghs_30m || [];
+                if (data.pool && data.pool.hash_rate_5m_ghs) {
+                    charts.chartHashRate.data.datasets[3].data = data.pool.hash_rate_5m_ghs;
+                }
                 charts.chartHashRate.update();
 
                 charts.chartMinerTemp.data.labels = data.miner.labels;
@@ -1000,16 +1114,35 @@
             }
         }
 
+        function refreshPoolRewards() {
+            fetch('/api/pool-rewards')
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.labels || data.labels.length === 0) return;
+                    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                    charts.chartPoolRewards.data.labels = data.labels.map(l => {
+                        // Parse "YYYY-MM-DD HH:MM:SS" by splitting to avoid timezone shifts
+                        const parts = l.split(/[- :]/);
+                        return `${months[parseInt(parts[1], 10) - 1]} ${parseInt(parts[2], 10)}`;
+                    });
+                    charts.chartPoolRewards.data.datasets[0].data = data.total_reward.map(v => Math.round(v * 1e8));
+                    charts.chartPoolRewards.update();
+                })
+                .catch(e => console.error('Error loading pool rewards:', e));
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             initCharts();
             loadHistory('24h');
             refreshLive();
             refreshThermalGrid();
             refreshWatchdog();
+            refreshPoolRewards();
             // Refresh every 30 seconds (synchronized with live data)
             setInterval(refreshLive, 30000);
             setInterval(refreshThermalGrid, 30000);
             setInterval(refreshWatchdog, 30000);
+            setInterval(refreshPoolRewards, 3600000);
         });
 
         document.querySelectorAll('input[name="range"]').forEach(radio => {
